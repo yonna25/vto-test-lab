@@ -1,39 +1,28 @@
 import React, { useRef, useState } from 'react';
-import { Camera, AlertCircle } from 'lucide-react';
+import { Camera } from 'lucide-react';
 
 const CameraCapture = ({ onCapture }) => {
   const videoRef = useRef(null);
   const [stream, setStream] = useState(null);
-  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
 
   const startCamera = async () => {
     try {
+      // On demande le strict minimum pour éviter les refus de Chrome
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: "user" },
+        video: true, 
         audio: false 
       });
       
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
-        // On tente de jouer
-        const playPromise = videoRef.current.play();
-        
-        if (playPromise !== undefined) {
-          playPromise
-            .then(() => setIsVideoPlaying(true))
-            .catch(() => setIsVideoPlaying(false));
-        }
+        // On attend un micro-délai pour laisser le hardware se stabiliser
+        setTimeout(() => {
+          videoRef.current.play();
+        }, 150);
         setStream(mediaStream);
       }
     } catch (err) {
-      alert("Erreur critique : " + err.message);
-    }
-  };
-
-  const forcePlay = () => {
-    if (videoRef.current) {
-      videoRef.current.play();
-      setIsVideoPlaying(true);
+      alert("Erreur hardware : " + err.message);
     }
   };
 
@@ -42,14 +31,11 @@ const CameraCapture = ({ onCapture }) => {
     canvas.width = videoRef.current.videoWidth;
     canvas.height = videoRef.current.videoHeight;
     const ctx = canvas.getContext('2d');
-    ctx.translate(canvas.width, 0);
-    ctx.scale(-1, 1);
     ctx.drawImage(videoRef.current, 0, 0);
     
     onCapture(canvas.toDataURL('image/webp'));
     stream.getTracks().forEach(t => t.stop());
     setStream(null);
-    setIsVideoPlaying(false);
   };
 
   return (
@@ -59,38 +45,20 @@ const CameraCapture = ({ onCapture }) => {
           <Camera size={40} />
         </button>
       ) : (
-        <div className="relative w-full aspect-[3/4] bg-gray-900 rounded-3xl overflow-hidden shadow-2xl border-4 border-white">
+        <div className="relative w-full bg-black rounded-3xl overflow-hidden">
           <video 
             ref={videoRef} 
             autoPlay 
             playsInline 
             muted 
-            className={`w-full h-full object-cover scale-x-[-1] ${!isVideoPlaying ? 'opacity-0' : 'opacity-100'}`}
+            className="w-full h-auto min-h-[300px]"
           />
-          
-          {!isVideoPlaying && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
-              <AlertCircle className="text-blue-400 mb-4" size={48} />
-              <p className="text-white text-sm mb-4">La caméra est prête mais attend votre signal.</p>
-              <button 
-                onClick={forcePlay}
-                className="bg-blue-500 text-white px-6 py-3 rounded-xl font-bold animate-bounce"
-              >
-                CLIQUEZ ICI POUR AFFICHER
-              </button>
-            </div>
-          )}
-
-          {isVideoPlaying && (
-            <button 
-              onClick={takePhoto} 
-              className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-white p-1 rounded-full shadow-2xl"
-            >
-              <div className="w-16 h-16 rounded-full border-4 border-gray-100 flex items-center justify-center">
-                <div className="w-12 h-12 bg-red-500 rounded-full"></div>
-              </div>
-            </button>
-          )}
+          <button 
+            onClick={takePhoto} 
+            className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white p-5 rounded-full shadow-2xl border-4 border-gray-200"
+          >
+            <div className="w-6 h-6 bg-red-600 rounded-full"></div>
+          </button>
         </div>
       )}
     </div>
