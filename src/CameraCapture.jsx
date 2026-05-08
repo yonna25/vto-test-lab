@@ -1,66 +1,43 @@
-import React, { useRef, useState } from 'react';
-import { Camera } from 'lucide-react';
+import React from 'react';
+import { UploadCloud } from 'lucide-react';
 
 const CameraCapture = ({ onCapture }) => {
-  const videoRef = useRef(null);
-  const [stream, setStream] = useState(null);
-
-  const startCamera = async () => {
-    try {
-      // On demande le strict minimum pour éviter les refus de Chrome
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        video: true, 
-        audio: false 
-      });
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        // On attend un micro-délai pour laisser le hardware se stabiliser
-        setTimeout(() => {
-          videoRef.current.play();
-        }, 150);
-        setStream(mediaStream);
-      }
-    } catch (err) {
-      alert("Erreur hardware : " + err.message);
+  const handleFileChange = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        // Envoie l'image en Base64 à App.jsx
+        onCapture(reader.result);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
-  const takePhoto = () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = videoRef.current.videoWidth;
-    canvas.height = videoRef.current.videoHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(videoRef.current, 0, 0);
-    
-    onCapture(canvas.toDataURL('image/webp'));
-    stream.getTracks().forEach(t => t.stop());
-    setStream(null);
-  };
-
   return (
-    <div className="w-full flex flex-col items-center">
-      {!stream ? (
-        <button onClick={startCamera} className="bg-blue-600 text-white p-8 rounded-full shadow-xl">
-          <Camera size={40} />
-        </button>
-      ) : (
-        <div className="relative w-full bg-black rounded-3xl overflow-hidden">
-          <video 
-            ref={videoRef} 
-            autoPlay 
-            playsInline 
-            muted 
-            className="w-full h-auto min-h-[300px]"
-          />
-          <button 
-            onClick={takePhoto} 
-            className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white p-5 rounded-full shadow-2xl border-4 border-gray-200"
-          >
-            <div className="w-6 h-6 bg-red-600 rounded-full"></div>
-          </button>
+    <div className="w-full flex flex-col items-center p-4">
+      {/* C'est un gros bouton qui agit comme une zone d'upload */}
+      <label className="flex flex-col items-center justify-center w-full h-64 border-4 border-dashed border-gray-300 rounded-3xl bg-gray-50 cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all group">
+        <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
+          <div className="bg-gray-200 group-hover:bg-blue-100 p-5 rounded-full shadow-inner mb-4 text-gray-500 group-hover:text-blue-600 transition-colors">
+            <UploadCloud size={40} />
+          </div>
+          <p className="mb-2 text-lg text-gray-700 group-hover:text-blue-800 font-bold">
+            Uploader ma photo
+          </p>
+          <p className="text-sm text-gray-500 group-hover:text-blue-600">
+            Cliquez pour choisir une photo de face (JPG, PNG)
+          </p>
         </div>
-      )}
+        
+        {/* Le vrai champ d'entrée, caché mais activé par le label */}
+        <input 
+          type="file" 
+          accept="image/jpeg, image/png, image/webp" 
+          className="hidden" 
+          onChange={handleFileChange}
+        />
+      </label>
     </div>
   );
 };
