@@ -1,12 +1,11 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { Camera } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { Camera, FlipHorizontal } from 'lucide-react';
 
 const CameraCapture = ({ onCapture }) => {
   const videoRef = useRef(null);
   const [stream, setStream] = useState(null);
 
   const startCamera = async () => {
-    // Nettoyage au cas où un flux existe déjà
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
     }
@@ -22,11 +21,15 @@ const CameraCapture = ({ onCapture }) => {
       
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
+        // Force la lecture pour les navigateurs mobiles
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current.play().catch(e => console.error("Erreur lecture auto:", e));
+        };
         setStream(mediaStream);
       }
     } catch (err) {
       console.error("Erreur caméra:", err);
-      alert("Impossible d'accéder à la caméra. Vérifiez les autorisations de votre navigateur.");
+      alert("Accès refusé. Vérifiez les paramètres de Chrome.");
     }
   };
 
@@ -38,16 +41,14 @@ const CameraCapture = ({ onCapture }) => {
     canvas.height = videoRef.current.videoHeight;
     const ctx = canvas.getContext('2d');
     
-    // Effet miroir pour que la photo soit naturelle
+    // Effet miroir pour la photo finale
     ctx.translate(canvas.width, 0);
     ctx.scale(-1, 1);
-    
     ctx.drawImage(videoRef.current, 0, 0);
-    const dataUrl = canvas.toDataURL('image/webp');
     
+    const dataUrl = canvas.toDataURL('image/webp');
     onCapture(dataUrl);
     
-    // Arrêter proprement
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
       setStream(null);
@@ -59,12 +60,12 @@ const CameraCapture = ({ onCapture }) => {
       {!stream ? (
         <button 
           onClick={startCamera} 
-          className="bg-blue-600 hover:bg-blue-700 text-white p-6 rounded-full shadow-2xl transition-transform active:scale-90"
+          className="bg-blue-600 hover:bg-blue-700 text-white p-8 rounded-full shadow-2xl transition-transform active:scale-95"
         >
-          <Camera size={32} />
+          <Camera size={40} />
         </button>
       ) : (
-        <div className="relative w-full rounded-2xl overflow-hidden bg-black aspect-video shadow-2xl">
+        <div className="relative w-full rounded-3xl overflow-hidden bg-black aspect-[3/4] shadow-2xl border-4 border-white">
           <video 
             ref={videoRef} 
             autoPlay 
@@ -72,12 +73,14 @@ const CameraCapture = ({ onCapture }) => {
             muted
             className="w-full h-full object-cover scale-x-[-1]" 
           />
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-4">
+          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-full flex justify-center px-6">
             <button 
               onClick={takePhoto} 
-              className="bg-white p-5 rounded-full shadow-2xl active:scale-95 transition-all border-4 border-gray-200"
+              className="bg-white p-1 rounded-full shadow-2xl active:scale-90 transition-all"
             >
-              <div className="w-6 h-6 bg-red-600 rounded-full animate-pulse"></div>
+              <div className="w-16 h-16 rounded-full border-4 border-gray-100 flex items-center justify-center">
+                <div className="w-12 h-12 bg-red-500 rounded-full"></div>
+              </div>
             </button>
           </div>
         </div>
