@@ -1,16 +1,18 @@
 /**
- * Service pour gérer les appels au modèle de Virtual Try-On
+ * Service de connexion à l'IA Replicate
+ * Utilise les variables d'environnement pour la sécurité
  */
-export const generateTryOn = async (userImageBase64, targetStyleUrl) => {
-  // Note : Dans un environnement de test, nous utilisons une URL d'API
-  // Vous devrez configurer votre clé API dans les variables d'environnement
-  const API_KEY = import.meta.env.VITE_REPLICATE_API_TOKEN;
 
+const API_KEY = import.meta.env.VITE_REPLICATE_API_TOKEN;
+const MODEL_VERSION = "7299ed28669976f7093570678d21ef9a82d02927233df86a7c797a7e8e6e580a"; // Modèle VTO
+
+export const generateVTO = async (faceImage, hairStyleUrl) => {
   if (!API_KEY) {
-    throw new Error("Clé API manquante. Configurez VITE_REPLICATE_API_TOKEN.");
+    throw new Error("Clé API manquante. Configurez VITE_REPLICATE_API_TOKEN sur Netlify.");
   }
 
   try {
+    // 1. Création de la prédiction
     const response = await fetch("https://api.replicate.com/v1/predictions", {
       method: "POST",
       headers: {
@@ -18,18 +20,38 @@ export const generateTryOn = async (userImageBase64, targetStyleUrl) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        // ID du modèle IDM-VTON (à titre d'exemple)
-        version: "71c33648a8010834371cd72535091f0951478161e1b2123f03b5b54bc9cf3457",
+        version: MODEL_VERSION,
         input: {
-          human_image: userImageBase64,
-          garment_image: targetStyleUrl,
-        }
-      })
+          image: faceImage,
+          mask: hairStyleUrl,
+          prompt: "high quality, professional hairstyle, realistic",
+        },
+      }),
     });
 
-    return await response.json();
+    const data = await response.json();
+    
+    if (data.detail) {
+      throw new Error(data.detail);
+    }
+
+    // 2. Récupération du résultat (Polling)
+    let prediction = data;
+    while (prediction.status !== "succeeded" && prediction.status !== "failed") {
+      await new Promise(r => setTimeout(r, 2000)); // Attendre 2 secondes
+      const res = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
+        headers: { "Authorization": `Token ${API_KEY}` },
+      });
+      prediction = await res.json();
+    }
+
+    if (prediction.status === "failed") {
+      throw new Error("La génération a échoué.");
+    }
+
+    return prediction.output; // URL de l'image générée
   } catch (error) {
-    console.error("Erreur lors de l'appel IA:", error);
+    console.error("Erreur VTO Service:", error);
     throw error;
   }
 };
