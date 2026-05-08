@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import CameraCapture from './CameraCapture';
 import StyleSelector from './StyleSelector';
-import { generateTryOn } from './vtoService';
+import { generateVTO } from './vtoService'; // Corrigé : le nom doit correspondre au service
 
 function App() {
   const [userImage, setUserImage] = useState(null);
@@ -13,9 +13,9 @@ function App() {
     if (!userImage || !selectedStyle) return;
     setLoading(true);
     try {
-      // Appel au service IA
-      const data = await generateTryOn(userImage, selectedStyle.url);
-      setResult(data.output); 
+      // Appel au service IA avec le bon nom de fonction
+      const output = await generateVTO(userImage, selectedStyle.url);
+      setResult(output); 
     } catch (err) {
       alert("Erreur lors de la génération. Vérifiez votre clé API.");
     } finally {
