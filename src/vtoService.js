@@ -1,30 +1,31 @@
 /**
- * Service VTO Ultra-simplifié (Zéro blocage CORS)
- * Ce fichier communique uniquement avec ton serveur Vercel.
+ * Service VTO pour AfroTresse - Version Hugging Face
+ * Ce service appelle ta fonction serverless sur Vercel.
  */
 export const generateVTO = async (faceImage, hairStyleUrl) => {
   try {
-    // On appelle ta route interne définie dans /api/generate.js
     const response = await fetch("/api/generate", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json" 
+      },
       body: JSON.stringify({
-        image: faceImage,
-        hair_image: hairStyleUrl
+        image: faceImage,      // Ta photo (base64)
+        hair_image: hairStyleUrl // L'URL de la coiffure
       }),
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      // Si le serveur renvoie une erreur (ex: version du modèle, clé API)
-      throw new Error(data.error || "Erreur serveur");
+      // On affiche l'erreur précise renvoyée par le serveur (ex: "Modèle en cours de chargement")
+      throw new Error(data.error || "Erreur lors de la génération");
     }
 
-    // Le serveur a fait tout le travail, il nous donne directement l'image
+    // Le serveur nous renvoie directement l'image en base64 prête à être affichée
     return data.output;
   } catch (error) {
-    console.error("VTO Error:", error.message);
+    console.error("Erreur VTO Service:", error.message);
     throw error;
   }
 };
