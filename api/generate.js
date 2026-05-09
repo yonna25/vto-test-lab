@@ -1,5 +1,7 @@
 export default async function handler(req, res) {
-  // Sécurité pour garantir une réponse JSON quoi qu'il arrive
+  // Sécurité JSON
+  res.setHeader('Content-Type', 'application/json');
+  
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Méthode non autorisée' });
   }
@@ -7,40 +9,43 @@ export default async function handler(req, res) {
   const { image, hair_image } = req.body;
   const HF_TOKEN = process.env.HUGGINGFACE_TOKEN;
 
-  // Vérification de la présence du jeton
   if (!HF_TOKEN) {
-    return res.status(500).json({ error: "Configuration Vercel incomplète : HUGGINGFACE_TOKEN manquant." });
+    return res.status(500).json({ error: "Configuration Vercel : HUGGINGFACE_TOKEN manquant." });
   }
 
   try {
+    // URL exacte pour l'Inference API
     const response = await fetch(
       "https://api-inference.huggingface.co/models/yisol/IDM-VTON",
       {
         headers: {
-          Authorization: `Bearer ${HF_TOKEN}`,
+          "Authorization": `Bearer ${HF_TOKEN}`,
           "Content-Type": "application/json",
         },
         method: "POST",
         body: JSON.stringify({
+          // Pour IDM-VTON, les noms des paramètres doivent être précis
           inputs: {
-            image: image,
-            garment_image: hair_image,
-          },
+            "background_image": image,
+            "garment_image": hair_image
+          }
         }),
       }
     );
 
-    // Si Hugging Face est en train de charger le modèle (froid)
+    // Gestion du réveil du modèle (Erreur 503)
     if (response.status === 503) {
-      return res.status(503).json({ error: "Le modèle IA se réveille... Réessayez dans 20 secondes." });
+      return res.status(503).json({ 
+        error: "Le modèle IA est en cours de chargement sur Hugging Face. Réessayez dans 30 secondes." 
+      });
     }
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Erreur HF (${response.status}): ${errorText}`);
+      const errorData = await response.json().catch(() => ({ error: "Erreur inconnue" }));
+      throw new Error(errorData.error || `Erreur HF: ${response.status}`);
     }
 
-    // Conversion de l'image binaire reçue en Base64 pour l'affichage
+    // Récupération de l'image
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const base64Image = buffer.toString('base64');
@@ -50,7 +55,7 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error("Erreur API Generate:", error.message);
+    console.error("Erreur API:", error.message);
     return res.status(500).json({ error: error.message });
   }
 }
