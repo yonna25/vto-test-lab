@@ -5,34 +5,38 @@ export default async function handler(req, res) {
   const API_KEY = process.env.REPLICATE_API_TOKEN;
 
   try {
-    // 1. Lancer la génération
-    const startResponse = await fetch("https://api.replicate.com/v1/predictions", {
+    const response = await fetch("https://api.replicate.com/v1/predictions", {
       method: "POST",
       headers: {
         "Authorization": `Token ${API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        version: "7299ed28669976f7093570678d21ef9a82d02927233df86a7c797a7e8e6e580a",
-        input: { image, hair_image }
+        // Nouvelle version correspondante au modèle idm-vton
+        version: "0513734a452173b8173e907e3a59d19a36266e55b48528559432bd21c7d7e985",
+        input: {
+          human_img: image,      // Ton selfie
+          garm_img: hair_image,  // La coiffure choisie
+          garment_des: "cute hairstyle"
+        },
       }),
     });
 
-    let prediction = await startResponse.json();
-    if (!startResponse.ok) throw new Error(prediction.detail || "Erreur Replicate");
+    let prediction = await response.json();
+    if (!response.ok) throw new Error(prediction.detail || "Erreur Replicate");
 
-    // 2. Attendre le résultat (Polling côté serveur)
+    // Attente du résultat final sur le serveur
     while (prediction.status !== "succeeded" && prediction.status !== "failed") {
       await new Promise(r => setTimeout(r, 2000));
-      const checkResponse = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
+      const check = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
         headers: { "Authorization": `Token ${API_KEY}` },
       });
-      prediction = await checkResponse.json();
+      prediction = await check.json();
     }
 
-    if (prediction.status === "failed") throw new Error("La génération a échoué sur Replicate");
+    if (prediction.status === "failed") throw new Error("La génération a échoué");
 
-    // 3. Renvoyer le résultat final au téléphone
+    // On renvoie l'URL de l'image générée
     return res.status(200).json({ output: prediction.output });
 
   } catch (error) {
