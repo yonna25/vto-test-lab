@@ -1,5 +1,4 @@
 export default async function handler(req, res) {
-  // Sécurité JSON
   res.setHeader('Content-Type', 'application/json');
   
   if (req.method !== 'POST') {
@@ -9,12 +8,7 @@ export default async function handler(req, res) {
   const { image, hair_image } = req.body;
   const HF_TOKEN = process.env.HUGGINGFACE_TOKEN;
 
-  if (!HF_TOKEN) {
-    return res.status(500).json({ error: "Configuration Vercel : HUGGINGFACE_TOKEN manquant." });
-  }
-
   try {
-    // URL exacte pour l'Inference API
     const response = await fetch(
       "https://api-inference.huggingface.co/models/yisol/IDM-VTON",
       {
@@ -24,28 +18,33 @@ export default async function handler(req, res) {
         },
         method: "POST",
         body: JSON.stringify({
-          // Pour IDM-VTON, les noms des paramètres doivent être précis
+          // Changement ici : certains modèles HF attendent une liste ou des clés spécifiques
           inputs: {
-            "background_image": image,
+            "image": image,
             "garment_image": hair_image
+          },
+          // On ajoute des paramètres par défaut pour aider le modèle
+          parameters: {
+            "denoising_steps": 30,
           }
         }),
       }
     );
 
-    // Gestion du réveil du modèle (Erreur 503)
+    // Cas spécifique : Modèle en cours de chargement
     if (response.status === 503) {
       return res.status(503).json({ 
-        error: "Le modèle IA est en cours de chargement sur Hugging Face. Réessayez dans 30 secondes." 
+        error: "Le modèle IA se réveille (chargement sur Hugging Face). Réessayez dans 30 secondes." 
       });
     }
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: "Erreur inconnue" }));
-      throw new Error(errorData.error || `Erreur HF: ${response.status}`);
+      // On essaye de lire le texte si le JSON échoue
+      const errorText = await response.text();
+      console.error("Détail erreur HF:", errorText);
+      return res.status(response.status).json({ error: `Hugging Face a dit : ${errorText.substring(0, 100)}` });
     }
 
-    // Récupération de l'image
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const base64Image = buffer.toString('base64');
@@ -55,7 +54,6 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error("Erreur API:", error.message);
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: "Erreur de connexion au serveur IA." });
   }
 }
