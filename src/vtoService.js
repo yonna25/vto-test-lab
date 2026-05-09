@@ -1,9 +1,12 @@
 /**
- * Service VTO avec vérification de configuration et Proxy CORS
+ * Service VTO avec Debugging de clé et Proxy CORS
  */
 
 const getApiKey = () => {
-  return import.meta.env.VITE_REPLICATE_API_TOKEN;
+  const key = import.meta.env.VITE_REPLICATE_API_TOKEN;
+  // Ce log te dira immédiatement si la clé est présente ou non dans la console
+  console.log("État de la clé API :", key ? "DÉTECTÉE (Commence par " + key.substring(0, 5) + ")" : "NON DÉTECTÉE");
+  return key;
 };
 
 const MODEL_VERSION = "7299ed28669976f7093570678d21ef9a82d02927233df86a7c797a7e8e6e580a";
@@ -13,11 +16,10 @@ export const generateVTO = async (faceImage, hairStyleUrl) => {
   const API_KEY = getApiKey();
 
   if (!API_KEY) {
-    throw new Error("Configuration API manquante.");
+    throw new Error("Configuration API manquante dans l'environnement.");
   }
 
   try {
-    // 1. Envoi de la prédiction via Proxy
     const targetUrl = "https://api.replicate.com/v1/predictions";
     const response = await fetch(PROXY_URL + encodeURIComponent(targetUrl), {
       method: "POST",
@@ -38,7 +40,6 @@ export const generateVTO = async (faceImage, hairStyleUrl) => {
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || "Erreur API Replicate");
 
-    // 2. Polling (attente du résultat) via Proxy
     let prediction = data;
     while (prediction.status !== "succeeded" && prediction.status !== "failed") {
       await new Promise(r => setTimeout(r, 2000));
