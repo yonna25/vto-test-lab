@@ -1,26 +1,26 @@
 /**
- * Service VTO avec Debugging de clé et Proxy CORS
+ * Service VTO avec Proxy AllOrigins (Plus stable)
  */
 
 const getApiKey = () => {
-  const key = import.meta.env.VITE_REPLICATE_API_TOKEN;
-  // Ce log te dira immédiatement si la clé est présente ou non dans la console
-  console.log("État de la clé API :", key ? "DÉTECTÉE (Commence par " + key.substring(0, 5) + ")" : "NON DÉTECTÉE");
-  return key;
+  return import.meta.env.VITE_REPLICATE_API_TOKEN;
 };
 
 const MODEL_VERSION = "7299ed28669976f7093570678d21ef9a82d02927233df86a7c797a7e8e6e580a";
-const PROXY_URL = "https://corsproxy.io/?";
+// Utilisation de AllOrigins pour contourner le blocage CORS
+const PROXY_URL = "https://api.allorigins.win/raw?url=";
 
 export const generateVTO = async (faceImage, hairStyleUrl) => {
   const API_KEY = getApiKey();
 
   if (!API_KEY) {
-    throw new Error("Configuration API manquante dans l'environnement.");
+    throw new Error("Configuration API manquante.");
   }
 
   try {
     const targetUrl = "https://api.replicate.com/v1/predictions";
+    
+    // 1. Envoi de la prédiction
     const response = await fetch(PROXY_URL + encodeURIComponent(targetUrl), {
       method: "POST",
       headers: {
@@ -37,9 +37,14 @@ export const generateVTO = async (faceImage, hairStyleUrl) => {
       }),
     });
 
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.detail || "Erreur API Replicate");
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || "Erreur API Replicate");
+    }
 
+    const data = await response.json();
+
+    // 2. Polling (attente du résultat)
     let prediction = data;
     while (prediction.status !== "succeeded" && prediction.status !== "failed") {
       await new Promise(r => setTimeout(r, 2000));
@@ -48,7 +53,10 @@ export const generateVTO = async (faceImage, hairStyleUrl) => {
       const res = await fetch(PROXY_URL + encodeURIComponent(pollUrl), {
         headers: { "Authorization": `Token ${API_KEY}` },
       });
-      prediction = await res.json();
+      
+      if (res.ok) {
+        prediction = await res.json();
+      }
     }
 
     if (prediction.status === "failed") throw new Error("Génération échouée");
