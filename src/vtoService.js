@@ -1,62 +1,38 @@
 /**
- * Service VTO avec Proxy AllOrigins (Plus stable)
+ * Service VTO mis à jour : Appel sécurisé via Vercel API Route
  */
 
-const getApiKey = () => {
-  return import.meta.env.VITE_REPLICATE_API_TOKEN;
-};
-
-const MODEL_VERSION = "7299ed28669976f7093570678d21ef9a82d02927233df86a7c797a7e8e6e580a";
-// Utilisation de AllOrigins pour contourner le blocage CORS
-const PROXY_URL = "https://api.allorigins.win/raw?url=";
-
 export const generateVTO = async (faceImage, hairStyleUrl) => {
-  const API_KEY = getApiKey();
-
-  if (!API_KEY) {
-    throw new Error("Configuration API manquante.");
-  }
-
   try {
-    const targetUrl = "https://api.replicate.com/v1/predictions";
-    
-    // 1. Envoi de la prédiction
-    const response = await fetch(PROXY_URL + encodeURIComponent(targetUrl), {
+    // 1. Appel de ton API interne (sécurisée sur le serveur Vercel)
+    const response = await fetch("/api/generate", {
       method: "POST",
-      headers: {
-        "Authorization": `Token ${API_KEY}`,
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        version: MODEL_VERSION,
-        input: {
-          image: faceImage,
-          hair_image: hairStyleUrl,
-          prompt: "high quality hairstyle try-on, realistic",
-        },
+        image: faceImage,
+        hair_image: hairStyleUrl,
+        prompt: "high quality hairstyle try-on, realistic"
       }),
     });
 
+    const data = await response.json();
+    
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || "Erreur API Replicate");
+      throw new Error(data.error || "Erreur lors de l'appel API");
     }
 
-    const data = await response.json();
-
-    // 2. Polling (attente du résultat)
+    // 2. Polling (attente du résultat) - On garde le polling en direct vers Replicate
+    // car le GET est généralement autorisé par CORS sur leurs serveurs
     let prediction = data;
     while (prediction.status !== "succeeded" && prediction.status !== "failed") {
       await new Promise(r => setTimeout(r, 2000));
       
-      const pollUrl = `https://api.replicate.com/v1/predictions/${prediction.id}`;
-      const res = await fetch(PROXY_URL + encodeURIComponent(pollUrl), {
-        headers: { "Authorization": `Token ${API_KEY}` },
+      const res = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
+        headers: { 
+          "Authorization": `Token ${import.meta.env.VITE_REPLICATE_API_TOKEN}` // Garde VITE_ ici car c'est côté client
+        },
       });
-      
-      if (res.ok) {
-        prediction = await res.json();
-      }
+      prediction = await res.json();
     }
 
     if (prediction.status === "failed") throw new Error("Génération échouée");
